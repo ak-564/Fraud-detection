@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraud Detection System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏦 Fraud Detection System</h1>
+            <p>Secure Banking Transaction Monitoring</p>
+        </header>
+
+        <main>
+            <section class="transaction-form">
+                <h2>Process Transaction</h2>
+                <form id="txnForm">
+                    <div class="form-group">
+                        <label for="accNo">Account Number:</label>
+                        <input type="number" id="accNo" required min="100" max="109" 
+                               placeholder="Enter 100-109">
+                        <small>Valid accounts: 100 to 109</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="amount">Amount (₹):</label>
+                        <input type="number" id="amount" required min="1" step="0.01"
+                               placeholder="Enter amount">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="location">Location:</label>
+                        <input type="text" id="location" required 
+                               placeholder="Enter city name">
+                    </div>
+                    
+                    <button type="submit" id="submitBtn">
+                        <span class="btn-text">Process Transaction</span>
+                        <span class="btn-loading" style="display: none;">Processing...</span>
+                    </button>
+                </form>
+            </section>
+
+            <section class="quick-actions">
+                <h3>Quick Test Scenarios:</h3>
+                <div class="action-buttons">
+                    <button type="button" onclick="fillSampleData('normal')" class="btn-secondary">
+                        Normal Transaction
+                    </button>
+                    <button type="button" onclick="fillSampleData('highValue')" class="btn-secondary">
+                        High Value
+                    </button>
+                    <button type="button" onclick="fillSampleData('rapid')" class="btn-secondary">
+                        Rapid Test
+                    </button>
+                    <button type="button" onclick="fillSampleData('travel')" class="btn-secondary">
+                        Travel Test
+                    </button>
+                </div>
+            </section>
+
+            <section class="results">
+                <h2>Transaction Result</h2>
+                <div id="resultCard" class="result-card hidden">
+                    <div id="balance" class="balance-info"></div>
+                    <div id="alerts" class="alerts"></div>
+                    <div id="transactionId" class="txn-id"></div>
+                </div>
+            </section>
+
+            <section class="system-info">
+                <h3>Fraud Detection Rules</h3>
+                <div class="rules">
+                    <div class="rule-item">
+                        <span class="rule-icon">💰</span>
+                        <div>
+                            <strong>High-value Transaction:</strong>
+                            <div>Amount > ₹50,000</div>
+                        </div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">⚡</span>
+                        <div>
+                            <strong>Rapid Transactions:</strong>
+                            <div>≥3 transactions within 60 seconds</div>
+                        </div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">✈️</span>
+                        <div>
+                            <strong>Impossible Travel:</strong>
+                            <div>Different locations within 10 minutes</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // DOM Elements
+        const form = document.getElementById('txnForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnLoading = submitBtn.querySelector('.btn-loading');
+        const resultCard = document.getElementById('resultCard');
+        const alertsDiv = document.getElementById('alerts');
+        const balanceDiv = document.getElementById('balance');
+        const txnIdDiv = document.getElementById('transactionId');
+
+        let transactionCounter = 1;
+
+        // Form submission handler
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const accNo = document.getElementById('accNo').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const location = document.getElementById('location').value.trim();
+
+            // Show loading state
+            setLoadingState(true);
+            showResult(false);
+
+            try {
+                const response = await fetch('/transaction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accNo, amount, location })
+                });
+
+                const data = await response.json();
+                displayResults(data, accNo, amount, location);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Network error. Please try again.');
+            } finally {
+                setLoadingState(false);
+            }
+        });
+
+        // Display results
+        function displayResults(data, accNo, amount, location) {
+            showResult(true);
+            const txnId = `TXN${Date.now().toString().slice(-6)}`;
+            
+            txnIdDiv.textContent = `Transaction ID: ${txnId}`;
+            
+            if (data.success) {
+                balanceDiv.innerHTML = `
+                    <div class="balance-amount">₹${data.balance.toLocaleString()}</div>
+                    <div class="balance-label">Updated Balance</div>
+                `;
+                
+                if (data.alerts.length === 0) {
+                    alertsDiv.innerHTML = `
+                        <div class="alert-success">
+                            ✅ Transaction Successful
+                        </div>
+                        <div class="alert-detail">
+                            Amount: ₹${amount.toLocaleString()} | Location: ${location}
+                        </div>
+                    `;
+                    alertsDiv.className = 'alerts success';
+                } else {
+                    let alertsHTML = `
+                        <div class="alert-warning">
+                            🚨 Fraud Alerts Detected
+                        </div>
+                    `;
+                    data.alerts.forEach(alert => {
+                        alertsHTML += `<div class="alert-item">• ${alert}</div>`;
+                    });
+                    alertsHTML += `
+                        <div class="alert-detail">
+                            Transaction processed with warnings
+                        </div>
+                    `;
+                    alertsDiv.innerHTML = alertsHTML;
+                    alertsDiv.className = 'alerts warning';
+                }
+            } else {
+                balanceDiv.innerHTML = '';
+                alertsDiv.innerHTML = `
+                    <div class="alert-error">
+                        ❌ Transaction Failed
+                    </div>
+                    <div class="alert-item">${data.alerts[0]}</div>
+                `;
+                alertsDiv.className = 'alerts error';
+            }
+        }
+
+        // UI Helper functions
+        function setLoadingState(loading) {
+            if (loading) {
+                btnText.style.display = 'none';
+                btnLoading.style.display = 'inline';
+                submitBtn.disabled = true;
+            } else {
+                btnText.style.display = 'inline';
+                btnLoading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        }
+
+        function showResult(show) {
+            resultCard.classList.toggle('hidden', !show);
+        }
+
+        function showError(message) {
+            showResult(true);
+            balanceDiv.innerHTML = '';
+            alertsDiv.innerHTML = `
+                <div class="alert-error">❌ ${message}</div>
+            `;
+            alertsDiv.className = 'alerts error';
+        }
+
+        // Sample data for testing
+        function fillSampleData(scenario) {
+            const samples = {
+                normal: { accNo: 100, amount: 10000, location: "Mumbai" },
+                highValue: { accNo: 101, amount: 75000, location: "Delhi" },
+                rapid: { accNo: 102, amount: 15000, location: "Bangalore" },
+                travel: { accNo: 103, amount: 25000, location: "Chennai" }
+            };
+            
+            const sample = samples[scenario];
+            document.getElementById('accNo').value = sample.accNo;
+            document.getElementById('amount').value = sample.amount;
+            document.getElementById('location').value = sample.location;
+            
+            // Scroll to form
+            document.querySelector('.transaction-form').scrollIntoView({ 
+                behavior: 'smooth' 
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Fraud Detection System Frontend Loaded');
+        });
+    </script>
+</body>
+</html>
